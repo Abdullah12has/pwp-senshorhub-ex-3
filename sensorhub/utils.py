@@ -13,8 +13,13 @@ def page_key(*args, **kwargs):
     
 def require_admin(func):
     def wrapper(*args, **kwargs):
-        # Get the API key from the request headers
-        api_key = request.headers.get("Sensorhub-Api-Key", "").strip()
+        # Get the API key from the request headers (check both possible header names)
+        api_key = request.headers.get("Sensorhub-Api-Key") or request.headers.get("apikey", "")
+        
+        if not api_key:
+            abort(403)  # No API key provided
+            
+        api_key = api_key.strip()
         
         # Hash the provided API key
         key_hash = ApiKey.key_hash(api_key)
@@ -33,13 +38,23 @@ def require_admin(func):
     
     return wrapper
 
+
 def require_sensor_key(func):
     def wrapper(self, sensor, *args, **kwargs):
-        key_hash = ApiKey.key_hash(request.headers.get("Sensorhub-Api-Key").strip())
+        api_key = request.headers.get("Sensorhub-Api-Key") or request.headers.get("apikey", "")
+        
+        if not api_key:
+            abort(403)  # No API key provided
+            
+        api_key = api_key.strip()
+        key_hash = ApiKey.key_hash(api_key)
+        
         db_key = ApiKey.query.filter_by(sensor=sensor).first()
         if db_key is not None and secrets.compare_digest(key_hash, db_key.key):
-            return func(*args, **kwargs)
-        raise Forbidden
+            return func(self, sensor, *args, **kwargs)
+        
+        abort(403)  # Invalid API key
+    
     return wrapper
 
 

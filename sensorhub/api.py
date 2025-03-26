@@ -17,3 +17,8 @@ api.add_resource(MeasurementCollection, "/sensors/<sensor:sensor>/measurements/"
 @api_bp.route("/")
 def entry():
     return Response(json.dumps({"api_version": "1.0", "api_name": "sensorhub"}), 200)
+
+
+@api_bp.errorhandler(403)
+def handle_forbidden(e):
+    return Response("", 403)
