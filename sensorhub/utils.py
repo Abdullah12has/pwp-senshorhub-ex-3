@@ -1,23 +1,36 @@
 import json
 import secrets
-from flask import Response, request, url_for
+from flask import Response, request, url_for, abort
 from werkzeug.exceptions import Forbidden, NotFound
 from werkzeug.routing import BaseConverter
 
 from sensorhub.constants import *
 from sensorhub.models import *
-
+import secrets
 def page_key(*args, **kwargs):
     start = request.args.get("start", 0)
     return request.path + f"[start_{start}]"
     
 def require_admin(func):
     def wrapper(*args, **kwargs):
-        key_hash = ApiKey.key_hash(request.headers.get("Sensorhub-Api-Key", "").strip())
+        # Get the API key from the request headers
+        api_key = request.headers.get("Sensorhub-Api-Key", "").strip()
+        
+        # Hash the provided API key
+        key_hash = ApiKey.key_hash(api_key)
+        
+        # Find the admin key in the database
         db_key = ApiKey.query.filter_by(admin=True).first()
-        if secrets.compare_digest(key_hash, db_key.key):
-            return func(*args, **kwargs)
-        raise Forbidden
+        
+        # Check if no admin key exists or the keys don't match
+        if not db_key or not secrets.compare_digest(key_hash, db_key.key):
+            # Explicitly raise a Forbidden exception
+            # This ensures a 403 status code is returned
+            abort(403)
+        
+        # If authentication succeeds, call the original function
+        return func(*args, **kwargs)
+    
     return wrapper
 
 def require_sensor_key(func):
